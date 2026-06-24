@@ -10,8 +10,13 @@ export default function SpreadsheetEditor({ fileId, fileName }) {
   const [saveState, setSaveState] = useState('saved'); // 'saved' | 'unsaved' | 'saving' | 'error'
   const sheetsRef = useRef(null);
   const saveTimerRef = useRef(null);
+  // FortuneSheet fires onChange immediately on mount before processing data.
+  // Block auto-save until after initialization completes to prevent overwriting loaded data.
+  const savingEnabledRef = useRef(false);
 
   useEffect(() => {
+    savingEnabledRef.current = false;
+    clearTimeout(saveTimerRef.current);
     setLoading(true);
     setSheets(null);
     getFile(fileId)
@@ -24,7 +29,17 @@ export default function SpreadsheetEditor({ fileId, fileName }) {
       .finally(() => setLoading(false));
   }, [fileId]);
 
+  // Enable saving after Workbook has mounted and FortuneSheet finishes its initial onChange calls
+  useEffect(() => {
+    if (!sheets) return;
+    const timer = setTimeout(() => {
+      savingEnabledRef.current = true;
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [sheets]);
+
   const handleChange = useCallback((data) => {
+    if (!savingEnabledRef.current) return;
     sheetsRef.current = data;
     setSaveState('unsaved');
     // Auto-save after 3 seconds of inactivity
